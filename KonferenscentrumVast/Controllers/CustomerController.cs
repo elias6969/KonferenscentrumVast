@@ -34,7 +34,7 @@ namespace KonferenscentrumVast.Controllers
         /// </summary>
         /// <returns>List of all customers</returns>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<CustomerResponseDto>>> GetAll()
+        public async Task<ActionResult<IEnumerable<CustomerResponseDto>>> GetAllCustomers()
         {
             var list = await _customers.GetAllAsync();
             return Ok(list.Select(ToDto));
@@ -48,7 +48,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="200">Returns the customer</response>
         /// <response code="404">Customer not found</response>
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<CustomerResponseDto>> GetById(int id)
+        public async Task<ActionResult<CustomerResponseDto>> GetCustomerById(int id)
         {
             var entity = await _customers.GetByIdAsync(id);
             if (entity == null) return NotFound();
@@ -64,7 +64,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="400">Email parameter is required</response>
         /// <response code="404">Customer not found</response>
         [HttpGet("by-email")]
-        public async Task<ActionResult<CustomerResponseDto>> GetByEmail([FromQuery] string email)
+        public async Task<ActionResult<CustomerResponseDto>> GetCustomerByEmail([FromQuery] string email)
         {
             if (string.IsNullOrWhiteSpace(email))
                 return BadRequest(new { message = "Email is required." });
@@ -83,7 +83,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="400">Invalid customer data or validation failed</response>
         /// <response code="409">Customer with email already exists</response>
         [HttpPost]
-        public async Task<ActionResult<CustomerResponseDto>> Create([FromBody] CustomerCreateDto dto)
+        public async Task<ActionResult<CustomerResponseDto>> CreateCustomer([FromBody] CustomerCreateDto dto)
         {
             var created = await _customerService.CreateAsync(
                 dto.FirstName,
@@ -96,7 +96,7 @@ namespace KonferenscentrumVast.Controllers
                 dto.City
             );
 
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, ToDto(created));
+            return CreatedAtAction(nameof(GetCustomerById), new { id = created.Id }, ToDto(created));
         }
 
         /// <summary>
@@ -110,7 +110,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="404">Customer not found</response>
         /// <response code="409">Email already used by another customer</response>
         [HttpPut("{id:int}")]
-        public async Task<ActionResult<CustomerResponseDto>> Update(int id, [FromBody] CustomerUpdateDto dto)
+        public async Task<ActionResult<CustomerResponseDto>> UpdateCustomer(int id, [FromBody] CustomerUpdateDto dto)
         {
             var updated = await _customerService.UpdateAsync(
                 id,
@@ -128,7 +128,7 @@ namespace KonferenscentrumVast.Controllers
         }
 
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> DeleteCustomer(int id)
         {
             await _customerService.DeleteAsync(id);
             return NoContent();
