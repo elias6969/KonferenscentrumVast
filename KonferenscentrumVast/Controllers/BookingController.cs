@@ -37,7 +37,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="200">Returns the booking</response>
         /// <response code="404">Booking not found</response>
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<BookingResponseDto>> GetById(int id)
+        public async Task<ActionResult<BookingResponseDto>> GetBookingById(int id)
         {
             var booking = await _bookings.GetByIdAsync(id);
             if (booking == null) return NotFound();
@@ -49,7 +49,7 @@ namespace KonferenscentrumVast.Controllers
         /// </summary>
         /// <returns>List of all bookings</returns>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<BookingResponseDto>>> GetAll()
+        public async Task<ActionResult<IEnumerable<BookingResponseDto>>> GetAllBookings()
         {
             var data = await _bookings.GetAllAsync();
             return Ok(data.Select(ToDto));
@@ -65,7 +65,7 @@ namespace KonferenscentrumVast.Controllers
         /// <returns>Filtered list of bookings</returns>
         /// <response code="200">Returns filtered bookings</response>
         [HttpGet("filter")]
-        public async Task<ActionResult<IEnumerable<BookingResponseDto>>> GetFiltered(
+        public async Task<ActionResult<IEnumerable<BookingResponseDto>>> GetFilteredBookings(
             [FromQuery] int? customerId,
             [FromQuery] int? facilityId,
             [FromQuery] DateTime? from,
@@ -105,7 +105,7 @@ namespace KonferenscentrumVast.Controllers
                 request.NumberOfParticipants,
                 request.Notes);
 
-            return CreatedAtAction(nameof(GetById), new { id = booking.Id }, ToDto(booking));
+            return CreatedAtAction(nameof(GetBookingById), new { id = booking.Id }, ToDto(booking));
         }
 
         /// <summary>

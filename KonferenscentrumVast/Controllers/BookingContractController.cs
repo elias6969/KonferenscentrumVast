@@ -35,7 +35,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="200">Returns the contract</response>
         /// <response code="404">Contract not found</response>
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<BookingContractResponseDto>> GetById(int id)
+        public async Task<ActionResult<BookingContractResponseDto>> GetContractById(int id)
         {
             var entity = await _service.GetByIdAsync(id);
             return Ok(ToDto(entity));
@@ -46,7 +46,7 @@ namespace KonferenscentrumVast.Controllers
         /// </summary>
         /// <returns>List of all contracts</returns>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<BookingContractResponseDto>>> GetAll()
+        public async Task<ActionResult<IEnumerable<BookingContractResponseDto>>> GetAllContracts()
         {
             var data = await _contracts.GetAllAsync();
             return Ok(data.Select(ToDto));
@@ -93,7 +93,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="400">Cannot modify signed or cancelled contract</response>
         /// <response code="404">Contract not found</response>
         [HttpPatch("{id:int}")]
-        public async Task<ActionResult<BookingContractResponseDto>> Patch(int id, [FromBody] BookingContractPatchDto dto)
+        public async Task<ActionResult<BookingContractResponseDto>> PatchContract(int id, [FromBody] BookingContractPatchDto dto)
         {
             var entity = await _service.PatchAsync(id, dto);
             return Ok(ToDto(entity));

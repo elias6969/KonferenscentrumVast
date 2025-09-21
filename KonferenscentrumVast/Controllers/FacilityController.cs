@@ -29,7 +29,7 @@ namespace KonferenscentrumVast.Controllers
         /// </summary>
         /// <returns>List of all facilities</returns>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<FacilityResponseDto>>> GetAll()
+        public async Task<ActionResult<IEnumerable<FacilityResponseDto>>> GetAllFacilities()
         {
             var list = await _service.GetAllAsync();
             return Ok(list.Select(ToDto));
@@ -41,7 +41,7 @@ namespace KonferenscentrumVast.Controllers
         /// </summary>
         /// <returns>List of active facilities</returns>
         [HttpGet("active")]
-        public async Task<ActionResult<IEnumerable<FacilityResponseDto>>> GetActive()
+        public async Task<ActionResult<IEnumerable<FacilityResponseDto>>> GetActiveFacilities()
         {
             var list = await _service.GetActiveAsync();
             return Ok(list.Select(ToDto));
@@ -55,7 +55,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="200">Returns the facility</response>
         /// <response code="404">Facility not found</response>
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<FacilityResponseDto>> GetById(int id)
+        public async Task<ActionResult<FacilityResponseDto>> GetFacilityById(int id)
         {
             var facility = await _service.GetByIdAsync(id);
             return Ok(ToDto(facility));
@@ -69,13 +69,13 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="201">Facility created successfully</response>
         /// <response code="400">Invalid facility data or validation failed</response>
         [HttpPost]
-        public async Task<ActionResult<FacilityResponseDto>> Create([FromBody] FacilityCreateDto dto)
+        public async Task<ActionResult<FacilityResponseDto>> CreateFacility([FromBody] FacilityCreateDto dto)
         {
             var facility = await _service.CreateAsync(
                 dto.Name, dto.Description, dto.Address, dto.PostalCode, dto.City,
                 dto.MaxCapacity, dto.PricePerDay, dto.IsActive);
 
-            return CreatedAtAction(nameof(GetById), new { id = facility.Id }, ToDto(facility));
+            return CreatedAtAction(nameof(GetFacilityById), new { id = facility.Id }, ToDto(facility));
         }
 
         /// <summary>
@@ -88,7 +88,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="400">Invalid facility data</response>
         /// <response code="404">Facility not found</response>
         [HttpPut("{id:int}")]
-        public async Task<ActionResult<FacilityResponseDto>> Update(int id, [FromBody] FacilityUpdateDto dto)
+        public async Task<ActionResult<FacilityResponseDto>> UpdateFacility(int id, [FromBody] FacilityUpdateDto dto)
         {
             var updated = await _service.UpdateAsync(
                 id, dto.Name, dto.Description, dto.Address, dto.PostalCode, dto.City,
@@ -105,7 +105,7 @@ namespace KonferenscentrumVast.Controllers
         /// <response code="204">Facility deleted successfully</response>
         /// <response code="404">Facility not found</response>
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> DeleteFacility(int id)
         {
             await _service.DeleteAsync(id);
             return NoContent();
@@ -124,7 +124,7 @@ namespace KonferenscentrumVast.Controllers
         /// Inactive facilities cannot be booked but maintain data integrity.
         /// </remarks>
         [HttpPatch("{id:int}/active")]
-        public async Task<ActionResult<FacilityResponseDto>> SetActive(int id, [FromBody] FacilitySetActiveDto dto)
+        public async Task<ActionResult<FacilityResponseDto>> SetActiveFacility(int id, [FromBody] FacilitySetActiveDto dto)
         {
             var updated = await _service.SetActiveAsync(id, dto.IsActive);
             return Ok(ToDto(updated));
