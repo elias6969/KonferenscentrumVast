@@ -1,0 +1,1 @@
+Host=/cloudsql/konferenscentrum-vast:europe-north1:konferensdb;Database=konferenscentrumdb;Username=appuser;Password=YourStrongPassword123!

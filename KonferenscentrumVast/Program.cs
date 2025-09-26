@@ -1,23 +1,63 @@
 ﻿using KonferenscentrumVast.Data;
 using KonferenscentrumVast.Repository.Implementations;
 using KonferenscentrumVast.Repository.Interfaces;
-using KonferenscentrumVast.Services;  
-using KonferenscentrumVast.Exceptions;       
+using KonferenscentrumVast.Services;
+using KonferenscentrumVast.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
+using Google.Cloud.SecretManager.V1;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// --- Logging ---
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
-// Controllers + JSON (optional: guard against reference loops if any entity slips through)
+string connectionString;
+
+if (builder.Environment.IsDevelopment())
+{
+    // Use appsettings.Development.json locally
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+}
+else
+{
+    // Use Secret Manager in Cloud Run
+    var secretClient = SecretManagerServiceClient.Create();
+    var secretName = new SecretVersionName("konferenscentrum-vast", "db-connection-string", "latest");
+    var secret = secretClient.AccessSecretVersion(secretName);
+    connectionString = secret.Payload.Data.ToStringUtf8();
+}
+
+// --- Database ---
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+// --- Repositories ---
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<IFacilityRepository, FacilityRepository>();
+builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+builder.Services.AddScoped<IBookingContractRepository, BookingContractRepository>();
+
+// --- Application Services ---
+builder.Services.AddScoped<BookingService>();
+builder.Services.AddScoped<FacilityService>();
+builder.Services.AddScoped<BookingContractService>();
+builder.Services.AddScoped<CustomerService>();
+
+// --- Controllers ---
 builder.Services.AddControllers();
 
-// Swagger/OpenAPI
+// --- Swagger/OpenAPI ---
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Konferenscentrum Väst API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Konferenscentrum Väst API",
+        Version = "v1"
+    });
 
     c.MapType<IFormFile>(() => new OpenApiSchema { Type = "string", Format = "binary" });
     c.MapType<DateOnly>(() => new OpenApiSchema { Type = "string", Format = "date" });
@@ -25,25 +65,13 @@ builder.Services.AddSwaggerGen(c =>
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
 });
 
-// Repositories
-builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
-builder.Services.AddScoped<IFacilityRepository, FacilityRepository>();
-builder.Services.AddScoped<IBookingRepository, BookingRepository>();
-builder.Services.AddScoped<IBookingContractRepository, BookingContractRepository>();
-
-// Application services
-builder.Services.AddScoped<BookingService>();
-builder.Services.AddScoped<FacilityService>();
-builder.Services.AddScoped<BookingContractService>();
-builder.Services.AddScoped<CustomerService>();
-
-// Database
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
+// --- CORS ---
 builder.Services.AddCors(opt =>
 {
     opt.AddPolicy("dev", policy =>
@@ -57,21 +85,38 @@ builder.Services.AddCors(opt =>
 
 var app = builder.Build();
 
+// --- Middleware ---
 if (app.Environment.IsDevelopment())
 {
-    app.UseDeveloperExceptionPage(); // add this
+    app.UseDeveloperExceptionPage();
 }
 
 app.UseSwagger();
-app.UseSwaggerUI(); // optional: c => { c.RoutePrefix = string.Empty; }
+app.UseSwaggerUI();
 
-
-
-app.UseExceptionMapping();    // our custom exception -> HTTP mapping
+app.UseExceptionMapping();
 app.UseHttpsRedirection();
-app.UseCors("dev");           // remove or change if not needed
+app.UseCors("dev");
 app.UseAuthorization();
 
 app.MapControllers();
+
+// --- Apply EF Core migrations at startup ---
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    try
+    {
+        app.Logger.LogInformation("Applying migrations...");
+        db.Database.Migrate();
+        app.Logger.LogInformation("Migrations applied successfully.");
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "An error occurred while applying migrations.");
+        throw;
+    }
+}
 
 app.Run();
