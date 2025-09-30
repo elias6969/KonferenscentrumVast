@@ -39,12 +39,14 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IFacilityRepository, FacilityRepository>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IBookingContractRepository, BookingContractRepository>();
+builder.Services.AddScoped<IFileRepository, FileRepository>();
 
 // --- Application Services ---
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<FacilityService>();
 builder.Services.AddScoped<BookingContractService>();
 builder.Services.AddScoped<CustomerService>();
+builder.Services.AddScoped<FileService>();
 
 // --- Controllers ---
 builder.Services.AddControllers();
@@ -101,7 +103,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// --- Apply EF Core migrations at startup ---
+// --- Applies EF Core migrations at startup ---
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
