@@ -1,4 +1,5 @@
 ﻿using System;
+
 namespace KonferenscentrumVast.DTO
 {
     public class FacilityCreateDto

@@ -25,6 +25,8 @@ namespace KonferenscentrumVast.Models
         public Customer Customer { get; set; } = null!;
         public Facility Facility { get; set; } = null!;
         public BookingContract? Contract { get; set; }
+
+        public ICollection<FileMetadata> Files { get; set; } = new List<FileMetadata>();
     }
 
     /// <summary>
