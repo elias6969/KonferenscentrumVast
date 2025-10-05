@@ -3,10 +3,15 @@ using KonferenscentrumVast.Repository.Implementations;
 using KonferenscentrumVast.Repository.Interfaces;
 using KonferenscentrumVast.Services;
 using KonferenscentrumVast.Exceptions;
+using KonferenscentrumVast.Swagger;
+using KonferenscentrumVast.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using Google.Cloud.SecretManager.V1;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,21 +19,42 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
+// --- Secret Manager client (reused everywhere) ---
+var secretClient = SecretManagerServiceClient.Create();
+
+// --- Load secrets ---
 string connectionString;
+string jwtKey;
+string bucketName;
 
 if (builder.Environment.IsDevelopment())
 {
-    // Use appsettings.Development.json locally
+    // Local dev from appsettings.Development.json
     connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    jwtKey = builder.Configuration["Jwt:Key"] ?? "local-dev-secret-change-me";
+    bucketName = builder.Configuration["FileStorage:BucketName"] ?? "local-dev-bucket";
 }
 else
 {
-    // Use Secret Manager in Cloud Run
-    var secretClient = SecretManagerServiceClient.Create();
-    var secretName = new SecretVersionName("konferenscentrum-vast", "db-connection-string", "latest");
-    var secret = secretClient.AccessSecretVersion(secretName);
-    connectionString = secret.Payload.Data.ToStringUtf8();
+    // Cloud Run: load from Secret Manager
+    var dbSecret = secretClient.AccessSecretVersion(
+        new SecretVersionName("konferenscentrum-vast", "db-connection-string", "latest"));
+    connectionString = dbSecret.Payload.Data.ToStringUtf8();
+
+    var jwtSecret = secretClient.AccessSecretVersion(
+        new SecretVersionName("konferenscentrum-vast", "jwt-key", "latest"));
+    jwtKey = jwtSecret.Payload.Data.ToStringUtf8();
+
+    var bucketSecret = secretClient.AccessSecretVersion(
+        new SecretVersionName("konferenscentrum-vast", "file-bucket-name", "latest"));
+    bucketName = bucketSecret.Payload.Data.ToStringUtf8();
 }
+
+// --- Register FileStorageOptions ---
+builder.Services.AddSingleton(new FileStorageOptions
+{
+    BucketName = bucketName
+});
 
 // --- Database ---
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -48,6 +74,22 @@ builder.Services.AddScoped<BookingContractService>();
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<FileService>();
 
+// --- JWT Authentication ---
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 // --- Controllers ---
 builder.Services.AddControllers();
 
@@ -65,12 +107,38 @@ builder.Services.AddSwaggerGen(c =>
     c.MapType<DateOnly>(() => new OpenApiSchema { Type = "string", Format = "date" });
     c.MapType<TimeOnly>(() => new OpenApiSchema { Type = "string", Format = "time" });
 
+    c.OperationFilter<FileUploadOperationFilter>();
+
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
     {
         c.IncludeXmlComments(xmlPath);
     }
+
+    // Add JWT support in Swagger
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
 });
 
 // --- CORS ---
@@ -85,6 +153,13 @@ builder.Services.AddCors(opt =>
     });
 });
 
+// --- Kestrel / Cloud Run port ---
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(int.Parse(port));
+});
+
 var app = builder.Build();
 
 // --- Middleware ---
@@ -96,9 +171,11 @@ if (app.Environment.IsDevelopment())
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// Order: exceptions -> HTTPS -> CORS -> Auth -> Controllers
 app.UseExceptionMapping();
 app.UseHttpsRedirection();
 app.UseCors("dev");
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
